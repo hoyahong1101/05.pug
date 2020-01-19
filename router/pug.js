@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
+const datetime = require('date-time');
 const path = require('path');
 const { pool, sqlErr } = require(path.join(__dirname, '../modules/mysql-conn'));
 const { upload } = require(path.join(__dirname, '../modules/multer-conn'));
-console.log(__dirname);
 
 /*
 /pug/update/4 <- 요청처리시
@@ -22,6 +22,13 @@ router.get(["/", "/:page"], async (req, res) => {
 			const connect = await pool.getConnection();
 			const result = await connect.query(sql);
 			connect.release();
+			for(let v of result[0]) {
+				if(v.realfile) v.fileIcon = true;
+			}
+			const resultData = result[0].map((v)=>{
+				v.wdate = datetime(v.wdate);
+				return v
+			})
 			vals.lists = result[0];
 			res.render("list.pug", vals);
 			break;
@@ -39,7 +46,7 @@ router.get("/view/:id", async (req, res) => {
 	let vals = {
 		title: "게시글 상세 보기",
 	}
-	console.log(req.header('x-forwarded-for'));
+	// console.log(req.ip);
 	let id = req.params.id;
 	const connect = await pool.getConnection();
 	let sql = "UPDATE board SET rnum = rnum + 1 WHERE id="+id;
@@ -48,26 +55,19 @@ router.get("/view/:id", async (req, res) => {
 	result = await connect.query(sql);
 	connect.release();
 	vals.data = result[0][0];
+	if(vals.data.realfile) {
+		let file = vals.data.realfile.split("-");
+		let filepath = "/uploads/"+file[0]+"/"+vals.data.realfile;
+		vals.data.filepath = filepath;
+		let img = ['.jpg', '.jpeg', '.png', '.gif'];
+		let ext = path.extname(vals.data.realfile).toLowerCase();
+		if(img.indexOf(ext) > -1) vals.data.fileChk = "img";
+		else vals.data.fileChk = "file";
+	}
+	else vals.data.fileChk = "";
+	//res.json(vals);
 	res.render("view.pug", vals);
 });
-
-function getClientIp(req) {
-  var ipAddress;
-  // The request may be forwarded from local web server.
-  var forwardedIpsStr = req.header('x-forwarded-for'); 
-  if (forwardedIpsStr) {
-    // 'x-forwarded-for' header may return multiple IP addresses in
-    // the format: "client IP, proxy 1 IP, proxy 2 IP" so take the
-    // the first one
-    var forwardedIps = forwardedIpsStr.split(',');
-    ipAddress = forwardedIps[0];
-  }
-  if (!ipAddress) {
-    // If request was not forwarded
-    ipAddress = req.connection.remoteAddress;
-  }
-  return ipAddress;
-};
 
 router.get("/delete/:id", async (req, res) => {
 	let id = req.params.id;
@@ -114,12 +114,29 @@ router.post("/update", async (req, res) => {
 });
 
 router.post("/create", upload.single("upfile"), async (req, res) => {
+	console.log(req.fileUploadChk);
+	let oriFile = ''; 
+	let realFile = '';
+	if(req.file) {
+		oriFile = req.file.originalname;
+		realFile = req.file.filename;
+	}
 	let sql = "INSERT INTO board SET title=?, writer=?, wdate=?, content=?, orifile=?, realfile=?";
-	let val = [req.body.title, req.body.writer, new Date(), req.body.content, req.file.originalname, req.file.filename];
+	let val = [req.body.title, req.body.writer, new Date(), req.body.content, oriFile, realFile];
 	const connect = await pool.getConnection();
 	const result = await connect.query(sql, val);
 	connect.release();
 	res.redirect("/pug");
+});
+
+router.get("/download/:id", async (req, res) => {
+	let id = req.params.id;
+	let sql = "SELECT realfile, orifile FROM board WHERE id="+id;
+	const connect = await pool.getConnection();
+	const result = await connect.query(sql);
+	let filepath = path.join(__dirname, "../uploads/"+result[0][0].realfile.split("-")[0]);
+	let file = filepath + "/" + result[0][0].realfile;
+	res.download(file, result[0][0].orifile);
 });
 
 module.exports = router;

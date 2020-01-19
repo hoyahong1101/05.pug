@@ -4,6 +4,7 @@ const methodOverride = require('method-override');
 const app = express();
 const port = 3000;
 const host = '127.0.0.1';
+const User = require(path.join(__dirname, "./models/User"));
 
 app.listen(port, () => {
 	console.log(`http://${host}:${port}`);
@@ -31,5 +32,8 @@ app.use(methodOverride((req, res) => {
 /* Router */
 const pugRouter = require(path.join(__dirname, "./router/pug"));
 const apiRouter = require(path.join(__dirname, "./router/api"));
+const userRouter = require(path.join(__dirname, "./router/user"));
 app.use("/pug", pugRouter);
 app.use("/api", apiRouter);
+app.use("/user", userRouter);
+

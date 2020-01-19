@@ -7,6 +7,13 @@ block content
 	.border.border-primary.rounded.p-3
 		b= data.title
 	.border.border-primary.rounded.p-3.my-3= data.content
+	if data.fileChk == "img"
+		.border.border-primary.rounded.p-3.my-3
+			img.mw-100(src=`${data.filepath}`)
+	else if data.fileChk == "file"
+		.border.border-primary.rounded.p-3.my-3
+			a(href=`/pug/download/${data.id}`)= data.orifile
+
 	.p-3.text-center
 		button.btn.btn-primary#btUpdate(data-id=`${data.id}`) 수정
 		button.btn.btn-danger#btDelete(data-id=`${data.id}`) 삭제
