@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { pool, sqlErr } = require('../modules/mysql-conn');
+const path = require('path');
+const { pool, sqlErr } = require(path.join(__dirname, '../modules/mysql-conn'));
+const { upload } = require(path.join(__dirname, '../modules/multer-conn'));
+console.log(__dirname);
 
 /*
 /pug/update/4 <- 요청처리시
@@ -36,14 +39,35 @@ router.get("/view/:id", async (req, res) => {
 	let vals = {
 		title: "게시글 상세 보기",
 	}
+	console.log(req.header('x-forwarded-for'));
 	let id = req.params.id;
-	let sql = "SELECT * FROM board WHERE id="+id;
 	const connect = await pool.getConnection();
-	const result = await connect.query(sql);
+	let sql = "UPDATE board SET rnum = rnum + 1 WHERE id="+id;
+	let result = await connect.query(sql);
+	sql = "SELECT * FROM board WHERE id="+id;
+	result = await connect.query(sql);
 	connect.release();
 	vals.data = result[0][0];
 	res.render("view.pug", vals);
 });
+
+function getClientIp(req) {
+  var ipAddress;
+  // The request may be forwarded from local web server.
+  var forwardedIpsStr = req.header('x-forwarded-for'); 
+  if (forwardedIpsStr) {
+    // 'x-forwarded-for' header may return multiple IP addresses in
+    // the format: "client IP, proxy 1 IP, proxy 2 IP" so take the
+    // the first one
+    var forwardedIps = forwardedIpsStr.split(',');
+    ipAddress = forwardedIps[0];
+  }
+  if (!ipAddress) {
+    // If request was not forwarded
+    ipAddress = req.connection.remoteAddress;
+  }
+  return ipAddress;
+};
 
 router.get("/delete/:id", async (req, res) => {
 	let id = req.params.id;
@@ -89,9 +113,9 @@ router.post("/update", async (req, res) => {
 	}
 });
 
-router.post("/create", async (req, res) => {
-	let sql = "INSERT INTO board SET title=?, writer=?, wdate=?, content=?";
-	let val = [req.body.title, req.body.writer, new Date(), req.body.content];
+router.post("/create", upload.single("upfile"), async (req, res) => {
+	let sql = "INSERT INTO board SET title=?, writer=?, wdate=?, content=?, orifile=?, realfile=?";
+	let val = [req.body.title, req.body.writer, new Date(), req.body.content, req.file.originalname, req.file.filename];
 	const connect = await pool.getConnection();
 	const result = await connect.query(sql, val);
 	connect.release();
